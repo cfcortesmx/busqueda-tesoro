@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Búsqueda del tesoro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fondo: #1b1f3a;
+    --panel: #262b52;
+    --borde: #3a4178;
+    --texto: #f3f1ea;
+    --tenue: #a9acd0;
+    --rojo: #e0474c;
+    --verde: #3fbf7f;
+    --oro: #f5c542;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--fondo); color: var(--texto);
+    font-family: Inter, system-ui, sans-serif; display: flex; justify-content: center; padding: 24px 16px;
+  }
+  main { width: 100%; max-width: 640px; }
+  .equipo {
+    font-family: "Press Start 2P", monospace; font-size: 12px; color: var(--rojo);
+    letter-spacing: 1px; margin: 0 0 10px; text-transform: uppercase;
+  }
+  h1 { font-family: "Press Start 2P", monospace; font-size: 20px; line-height: 1.5; margin: 0 0 6px; }
+  .ayuda { color: var(--tenue); margin: 0 0 22px; font-size: 15px; }
+  .puntos {
+    display: flex; align-items: baseline; gap: 10px; background: var(--panel);
+    border: 2px solid var(--borde); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px;
+  }
+  .puntos b { font-family: "Press Start 2P", monospace; font-size: 22px; color: var(--oro); }
+  .puntos span { color: var(--tenue); }
+  .frase { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 22px; min-height: 52px; }
+  .palabra {
+    display: flex; border: 2px solid var(--borde); border-radius: 10px; overflow: hidden;
+    background: var(--panel); transition: border-color .3s, box-shadow .3s;
+  }
+  .palabra.completa { border-color: var(--verde); box-shadow: 0 0 0 3px rgba(63,191,127,.25); }
+  .mitad {
+    min-width: 78px; padding: 14px 10px; text-align: center;
+    font-family: "Press Start 2P", monospace; font-size: 14px; color: var(--tenue);
+  }
+  .mitad + .mitad { border-left: 2px dashed var(--borde); }
+  .mitad.vista { color: var(--texto); }
+  .palabra.completa .mitad { color: var(--verde); }
+  .palabra.completa .mitad + .mitad { border-left-color: transparent; }
+  form { display: flex; gap: 10px; }
+  input {
+    flex: 1; min-width: 0; font: 600 18px Inter, sans-serif; text-transform: uppercase; letter-spacing: 1px;
+    padding: 14px; border-radius: 10px; border: 2px solid var(--borde); background: #12152b; color: var(--texto);
+  }
+  input:focus { outline: none; border-color: var(--oro); }
+  button {
+    font: 800 16px Inter, sans-serif; padding: 0 20px; border-radius: 10px; border: 0;
+    background: var(--oro); color: #1b1f3a; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: wait; }
+  .mensaje { min-height: 26px; margin: 14px 0 0; font-weight: 600; }
+  .mensaje.bien { color: var(--verde); }
+  .mensaje.mal { color: var(--rojo); }
+  .mensaje.oro { color: var(--oro); }
+  .mensaje.tenue { color: var(--tenue); font-weight: 400; }
+  .reiniciar { margin-top: 30px; background: none; color: var(--tenue); font-weight: 400; font-size: 13px; padding: 0; text-decoration: underline; }
+</style>
+</head>
+<body>
+<main>
+  <p class="equipo" id="equipo">Equipo · prueba</p>
+  <h1>Búsqueda del tesoro</h1>
+  <p class="ayuda">Cada regalo escondido trae un código. Escríbelo aquí para descubrir su mitad de la frase.</p>
+
+  <div class="puntos"><b id="puntos">–</b><span>puntos</span></div>
+
+  <div class="frase" id="frase"></div>
+
+  <form id="forma" autocomplete="off">
+    <input id="codigo" placeholder="Ej. FE-03B" aria-label="Código">
+    <button type="submit" id="abrir">Abrir</button>
+  </form>
+  <p class="mensaje tenue" id="mensaje">Cargando…</p>
+
+  <button class="reiniciar" id="reiniciar" type="button">Reiniciar la prueba</button>
+</main>
+
+<script src="config.js"></script>
+<script>
+  var EQUIPO = (new URLSearchParams(location.search).get("equipo") || "rojo").toLowerCase();
+  document.getElementById("equipo").textContent = "Equipo " + EQUIPO + " · prueba";
+
+  function preguntar(params) {
+    params.equipo = EQUIPO;
+    var url = window.API_URL + "?" + new URLSearchParams(params).toString();
+    return fetch(url).then(function (r) { return r.json(); });
+  }
+
+  function pintar(estado) {
+    var frase = document.getElementById("frase");
+    frase.innerHTML = "";
+    estado.palabras.forEach(function (par) {
+      var caja = document.createElement("div");
+      caja.className = "palabra";
+      var listas = 0;
+      par.forEach(function (texto) {
+        if (texto) listas++;
+        var celda = document.createElement("div");
+        celda.className = "mitad" + (texto ? " vista" : "");
+        celda.textContent = texto || "? ? ?";
+        caja.appendChild(celda);
+      });
+      if (listas === par.length) caja.classList.add("completa");
+      frase.appendChild(caja);
+    });
+    document.getElementById("puntos").textContent = estado.puntos;
+  }
+
+  function avisar(texto, tipo) {
+    var m = document.getElementById("mensaje");
+    m.textContent = texto;
+    m.className = "mensaje " + tipo;
+  }
+
+  function ocupado(si) {
+    document.getElementById("abrir").disabled = si;
+  }
+
+  function fallo() {
+    ocupado(false);
+    avisar("No pudimos conectar. Intenta de nuevo.", "mal");
+  }
+
+  document.getElementById("forma").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var campo = document.getElementById("codigo");
+    var codigo = campo.value.trim();
+    if (!codigo) return;
+    campo.value = "";
+    ocupado(true);
+    avisar("Abriendo…", "tenue");
+    preguntar({ accion: "codigo", codigo: codigo }).then(function (r) {
+      ocupado(false);
+      if (!r.ok) { avisar(r.error || "Algo falló.", "mal"); return; }
+      pintar(r.estado);
+      var mensajes = {
+        error: ["Ese código no existe. −1 punto.", "mal"],
+        repetido: ["Ese ya lo tenían.", "mal"],
+        mitad: ["Encontraron «" + r.texto + "». Falta su otra mitad.", "bien"],
+        par: ["¡Par completo: " + r.palabra + "! +3 puntos.", "bien"],
+        frase: ["¡Frase completa! +10 de bono.", "oro"]
+      };
+      var m = mensajes[r.resultado];
+      avisar(m[0], m[1]);
+    }).catch(fallo);
+  });
+
+  document.getElementById("reiniciar").addEventListener("click", function () {
+    ocupado(true);
+    preguntar({ accion: "reiniciar" }).then(function (r) {
+      ocupado(false);
+      if (r.ok) { pintar(r.estado); avisar("", "tenue"); }
+    }).catch(fallo);
+  });
+
+  if (!window.API_URL || window.API_URL.indexOf("PEGAR") >= 0) {
+    avisar("Falta conectar la caja fuerte (API_URL en config.js).", "mal");
+  } else {
+    preguntar({}).then(function (r) {
+      if (!r.ok) { avisar(r.error || "Algo falló.", "mal"); return; }
+      pintar(r.estado);
+      avisar("", "tenue");
+    }).catch(fallo);
+  }
+</script>
+</body>
+</html>
